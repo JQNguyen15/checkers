@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Board</title>
+</head>
+
+<body>
+ 
+<canvas id="myCanvas" width="400" height="400" style="border:2px solid #d3d3d3;">
+</canvas>
+<script>
+ 
+var c=document.getElementById("myCanvas");
+var ctx=c.getContext("2d");
+var sqW= ctx.canvas.width/8;
+var sqH= ctx.canvas.height/8;
+var mX =0;
+var mY =0;
+var selPiece;
+var tempPiece;
+var selected = false;
+var continueTurn = false;
+var lockPiece = null;
+var activeplayer=0;
+var pArr = new Array();//stores all pieces
+var FPS = 30;
+
+//crimson  colour
+
+//draws board
+function drawBoard(){
+	ctx.fillStyle="#FF0000";
+	ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+	ctx.fillStyle="#000000";
+	for (row=0;row<8;++row){
+		for (col=0;col<8;++col){
+			if (col%2==1 && row%2==0){
+				ctx.fillRect(col*sqW,row*sqH,sqW,sqH);
+			}
+			else if (col%2==0 && row%2==1){
+				ctx.fillRect(col*sqW,row*sqH,sqW,sqH);
+			}
+		}
+	}
+}
+
+c.addEventListener("mousedown",function(evt){
+	var mousePos  = getMousePos(c,evt);
+	mX=mousePos.x/sqW>>0;//bitshift to get int division result
+	mY=mousePos.y/sqH>>0;
+	
+	for(var i=0;i<pArr.length;i++){
+		 if (activeplayer==pArr[i].player && mX==pArr[i].x && mY==pArr[i].y){
+			selPiece=pArr[i];
+			selected = true;
+			break;
+		}
+	}
+	
+},false);
+
+c.addEventListener("mouseup",function(evt){
+	var mousePos  = getMousePos(c,evt);
+	mX=mousePos.x/sqW>>0;//bitshift to get int division result
+	mY=mousePos.y/sqH>>0;
+	
+	if(selected && (legalMove(selPiece,mX,mY)||capture(selPiece,mX,mY,pArr))){
+
+		if (!continueTurn){
+			selected=false;
+			activeplayer=(activeplayer+1)%2;
+		}
+		if (activeplayer==1)//debug
+			console.log("p: red's turn");
+		else
+			console.log("p: black's turn");
+	}
+},false)
+
+function getMousePos(c,evt){
+	var rectBound = c.getBoundingClientRect();
+	return {
+      x: evt.clientX - rectBound.left,
+      y: evt.clientY - rectBound.top
+    };
+}
+
+//piece obj definition
+function piece(player, status,x,y){
+	this.player = player;
+	this.status = status;//0=captured,1=normal,2=kinged
+	this.x=x;
+	this.y=y;
+}
+
+//piece initialize 
+for (row=0;row<8;++row){
+	for (col=0;col<8;++col){
+		if ((col%2==1 && row%2==0 && row<3)||(col%2==0 && row%2==1 && row<3)){
+			pArr.push (new piece(0,1,col,row));
+		}
+		else if ((col%2==1 && row%2==0 && row<3)||(col%2==0 && row%2==1 && row<3)){
+			pArr.push (new piece(0,1,col,row));
+		}
+		else if ((col%2==1 && row%2==0 && row>4)||(col%2==0 && row%2==1 && row>4)){
+			pArr.push (new piece(1,1,col,row));
+		}
+		else if ((col%2==1 && row%2==0 && row>4)||(col%2==0 && row%2==1 && row>4)){
+			pArr.push (new piece(1,1,col,row));
+		}
+	}	
+}
+
+function drawPieces(){
+	for (var i = 0; i<pArr.length; i++){
+		if (pArr[i].player==0){
+			ctx.fillStyle='grey';
+			ctx.beginPath();
+			ctx.arc(pArr[i].x*sqW+sqW/2,pArr[i].y*sqH+sqH/2,sqW/2*.75,0,2*Math.PI);
+			ctx.fill();
+		}
+		else if (pArr[i].player==1){
+			ctx.fillStyle='darkred';
+			ctx.beginPath();
+			ctx.arc(pArr[i].x*sqW+sqW/2,pArr[i].y*sqH+sqH/2,sqW/2*.75,0,2*Math.PI);
+			ctx.fill();
+		}
+		if (pArr[i].status==2){
+			ctx.fillStyle='yellow';
+			ctx.beginPath();
+			ctx.arc(pArr[i].x*sqW+sqW/2,pArr[i].y*sqH+sqH/2,sqW/2*.1,0,2*Math.PI);
+			ctx.fill();
+		}
+	}
+}
+
+function legalMove(piece,mX,mY){
+	if (isOdd(mX+mY) && unocc(mX,mY) && fwdmov(piece,mY,mX)){
+		piece.x = mX;
+		piece.y = mY;
+		kingMe(piece)
+		return true;
+	}
+	else
+		return false
+}
+
+function removeDead(arr){
+	for (var i = 0; i<arr.length; i++){
+		if (arr[i].status ==0){
+			arr.splice(i,1);
+			removeDead(arr);
+			break;
+		}
+	}
+}
+
+function unocc(mX,mY){
+	if (!between(mX,0,7)||!between(mY,0,7) ){
+		return false;
+	}
+	
+	for (var i = 0; i<pArr.length; i++){
+		if (mX==pArr[i].x && mY==pArr[i].y){
+			return false;
+		}
+	}
+	return true;
+}
+
+function fwdmov(piece, mY, mX){
+	if (piece.status ==1 && piece.player==0 && mY==piece.y+1 && Math.abs(piece.x-mX)==1){
+		return true;
+	}
+	else if (piece.status ==1 && piece.player==1 && mY==piece.y-1){
+		return true; 
+	}
+	else if (piece.status ==2 &&  Math.abs(piece.x-mX)==1 &&  Math.abs(piece.y-mY)==1 ){
+		return true;
+	}
+	return false;
+}
+
+function capture(sel,mX,mY,pieces){
+	var update=false;
+	if (!isOdd(mX+mY) || !unocc(mX,mY)){
+		return false;
+	}	
+	if (sel.status==2){
+		if (captureUL(sel,mX,mY,pieces)|| captureUR(sel,mX,mY,pieces) ||
+			captureLL(sel,mX,mY,pieces) || captureLR(sel,mX,mY,pieces)){
+			update=true;
+			}
+	}
+	else if (sel.player==0){
+		if (captureLL(sel,mX,mY,pieces) ||captureLR(sel,mX,mY,pieces)){
+			update=true;
+		}
+	}
+	else if (sel.player==1){
+		if (captureUL(sel,mX,mY,pieces) ||captureUR(sel,mX,mY,pieces)){
+			update=true;
+		}
+	} 
+	if (update){
+		sel.x=mX;
+		sel.y=mY;
+		tempPiece.status=0;
+		tempPiece=null;
+		removeDead(pieces);
+		
+		kingMe(sel);
+		if (canCapture (sel,pieces)) {
+			continueTurn=true;
+			lockPiece=sel;
+		}
+		else {
+			continueTurn=false;
+		}
+		
+		return true;
+	}
+	
+	return false;
+}
+
+function canCapture(sel,pieces){
+	if (sel.status==2 && (canCaptureUp(sel,pieces) || canCaptureDown(sel,pieces))) {
+		return true;
+	}
+	else if (sel.player==0 && canCaptureDown(sel,pieces)){
+		return true;
+	}
+	else if (sel.player==1 && canCaptureUp(sel,pieces)){
+		return true;
+	}
+	
+	return false;
+
+}
+
+function captureUL(sel,mX,mY,pieces){	
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		if (mX+1 == pieces[i].x && mY+1 == pieces[i].y && sel.player!=pieces[i].player &&
+				sel.x == pieces[i].x+1 && sel.y == pieces[i].y+1){
+			tempPiece=pieces[i];
+			return true;
+		}
+	}
+	return false;
+}
+
+function captureUR(sel,mX,mY,pieces){	
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		if (mX-1 == pieces[i].x && mY+1 == pieces[i].y && sel.player!=pieces[i].player&&
+				sel.x== pieces[i].x -1 && sel.y == pieces[i].y+1){
+			tempPiece=pieces[i];
+			return true;
+		}
+	}
+	return false;
+}
+
+function captureLL(sel,mX,mY,pieces){	
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		if (mX+1 == pieces[i].x && mY-1 == pieces[i].y && sel.player!=pieces[i].player &&
+				sel.x== pieces[i].x+1 && sel.y == pieces[i].y-1){
+			tempPiece=pieces[i];
+			return true;
+		}
+	}
+	return false;
+}
+
+function captureLR(sel,mX,mY,pieces){	
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		if (mX-1 == pieces[i].x && mY-1 == pieces[i].y && sel.player!=pieces[i].player&&
+				sel.x== pieces[i].x-1 && sel.y == pieces[i].y-1){
+			tempPiece=pieces[i];
+			return true;
+		}
+	}
+	return false;
+}
+
+function canCaptureUp(sel,pieces){
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		
+		if ((unocc(sel.x-2,sel.y-2) && captureUL(sel,sel.x-2,sel.y-2,pieces)) || 
+				(unocc(sel.x+2,sel.y-2) && captureUR(sel,sel.x+2,sel.y-2,pieces))){
+			
+			if (unocc(sel.x-2,sel.y-2) && captureUL(sel,sel.x-2,sel.y-2,pieces))
+				console.log("capture UL");
+			else
+				console.log("capture UR");
+			return true;
+		}
+	}
+	return false;
+}
+
+function canCaptureDown(sel,pieces){
+	var len=pieces.length;
+	for (var i = 0; i<len; i++){
+		if ((unocc(sel.x-2,sel.y+2) && captureLL(sel,sel.x-2,sel.y+2,pieces)) || 
+				(unocc(sel.x+2,sel.y+2) && captureLR(sel,sel.x+2,sel.y+2,pieces))){
+
+			if (unocc(sel.x-2,sel.y+2) && captureLL(sel,sel.x-2,sel.y+2,pieces))
+				console.log("capture LL");
+			else
+				console.log("capture LR");
+			
+			return true;
+		}
+	}
+	return false;
+}
+
+function between(x, min, max) {
+  return x >= min && x <= max;
+}
+
+function isOdd(num){
+	return !!(num%2);
+}
+
+function kingMe(sel){
+	if (sel.player==0 && sel.y==7 && sel.status==1){
+		sel.status=2;
+	}
+	else if (sel.player==1 && sel.y==0 && sel.status==1){
+		sel.status=2;
+	}
+}
+
+//game loop
+console.log("p: black's turn");
+setInterval(function() {
+	drawBoard();
+	drawPieces();
+	
+}, 1000/FPS);
+
+</script>
+
+
+
+</body>
+</html>
