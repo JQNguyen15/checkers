@@ -3,6 +3,7 @@
 Checkers game done in javascript with rails UI. 
 Features a sign up and login authentication.
 Currently can only play against players locally.
+Deployed on checkersjn.herokuapp.com
 
 * Ruby version 2.3.0
 * Rails version 4.2.6
@@ -16,3 +17,8 @@ Currently can only play against players locally.
 - Multiplayer matchmaking
 - ELO system
 - AI for single player
+
+== Deployment on heroku
+- fork from git
+- sync up on heroku
+- run command "heroku run rake db:migrate --app <appname on heroku>" while in the folder with heroku toolbelt installed
